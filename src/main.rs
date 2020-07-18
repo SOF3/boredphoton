@@ -79,7 +79,12 @@ impl serenity::client::EventHandler for Handler {
             let guild = message.guild(&ctx);
             let channel = message.channel(&ctx);
             if let (Some(guild), Some(channel::Channel::Guild(channel))) = (guild, channel) {
-                log::info!("Message from {} #{}: {}", &guild.read().name, &channel.read().name, &message.content);
+                log::info!(
+                    "Message from {} #{}: {}",
+                    &guild.read().name,
+                    &channel.read().name,
+                    &message.content
+                );
             }
 
             if self
@@ -97,7 +102,7 @@ impl serenity::client::EventHandler for Handler {
                 match cmd {
                     "invite" => {
                         message.reply(&ctx, format!("Invite link: {}", &self.invite_link))?;
-                    },
+                    }
                     "adm" => {
                         if !ADMINS.contains(message.author.id.as_u64()) {
                             return Ok(());
@@ -107,10 +112,10 @@ impl serenity::client::EventHandler for Handler {
                             Some("stop") => {
                                 self.guild_joins.finalize();
                                 std::process::exit(0);
-                            },
+                            }
                             _ => (),
                         }
-                    },
+                    }
                     _ => (),
                 }
             }
@@ -125,7 +130,13 @@ impl serenity::client::EventHandler for Handler {
 
             let AddResult { current, average } = self.guild_joins.add(guild_id);
 
-            log::info!("Guild {} stats: {} / {} = {}", &guild.name, current, average, (current as f64) / average);
+            log::info!(
+                "Guild {} stats: {} / {} = {}",
+                &guild.name,
+                current,
+                average,
+                (current as f64) / average
+            );
 
             Ok(())
         })
