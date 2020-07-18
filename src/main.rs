@@ -79,10 +79,11 @@ impl serenity::client::EventHandler for Handler {
             let guild = message.guild(&ctx);
             let channel = message.channel(&ctx);
             if let (Some(guild), Some(channel::Channel::Guild(channel))) = (guild, channel) {
-                log::info!(
-                    "Message from {} #{}: {}",
+                log::debug!(
+                    "Message from {} #{}: <{}> {}",
                     &guild.read().name,
                     &channel.read().name,
+                    &message.author.name,
                     &message.content
                 );
             }
