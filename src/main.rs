@@ -108,11 +108,25 @@ impl serenity::client::EventHandler for Handler {
                         if !ADMINS.contains(message.author.id.as_u64()) {
                             return Ok(());
                         }
-                        #[allow(clippy::single_match)]
                         match args.next() {
                             Some("stop") => {
                                 self.guild_joins.finalize();
                                 std::process::exit(0);
+                            }
+                            Some("stat") => {
+                                if let Some(guild) = message.guild_id {
+                                    let AddResult { current, average } =
+                                        self.guild_joins.query(guild);
+                                    message.reply(
+                                        &ctx,
+                                        format!(
+                                            "Current / average = {} / {} = {}",
+                                            current,
+                                            average,
+                                            (current as f64) / (average as f64)
+                                        ),
+                                    )?;
+                                }
                             }
                             _ => (),
                         }
@@ -129,7 +143,7 @@ impl serenity::client::EventHandler for Handler {
         trying(|| {
             let guild = guild::Guild::get(&ctx, guild_id)?;
 
-            let AddResult { current, average } = self.guild_joins.add(guild_id);
+            let AddResult { current, average } = self.guild_joins.add(guild_id, 1);
 
             log::info!(
                 "Guild {} stats: {} / {} = {}",
@@ -178,14 +192,14 @@ impl GuildJoinsMap {
         }
     }
 
-    pub fn add(&self, guild: id::GuildId) -> AddResult {
+    pub fn add(&self, guild: id::GuildId, count: u32) -> AddResult {
         loop {
             {
                 let guard = self.lock.read().unwrap();
                 if let Some(gj) = guard.get(&guild) {
                     {
                         let gjg = gj.read().unwrap();
-                        if let Ok(current) = gjg.add() {
+                        if let Ok(current) = gjg.add(count) {
                             let average = gjg.average();
                             return AddResult { current, average };
                         }
@@ -193,7 +207,7 @@ impl GuildJoinsMap {
 
                     {
                         let mut gjg = gj.write().unwrap();
-                        let current = gjg.add_mut();
+                        let current = gjg.add_mut(count);
                         let average = gjg.average();
                         return AddResult { current, average };
                     }
@@ -206,6 +220,10 @@ impl GuildJoinsMap {
                 let _ = guard.insert(guild, RwLock::new(gj));
             }
         }
+    }
+
+    pub fn query(&self, guild: id::GuildId) -> AddResult {
+        self.add(guild, 0)
     }
 }
 
@@ -239,16 +257,18 @@ impl GuildJoins {
         Ok(())
     }
 
-    fn add(&self) -> Result<u32, ()> {
+    fn add(&self, count: u32) -> Result<u32, ()> {
         let hour = current_hour();
         if hour > self.current_hour {
             return Err(());
         }
-        Ok(self.current.fetch_add(1, Ordering::Relaxed))
+        Ok(self.current.fetch_add(count, Ordering::Relaxed))
     }
 
-    fn add_mut(&mut self) -> u32 {
+    fn add_mut(&mut self, count: u32) -> u32 {
         let hour = current_hour();
+        let current = self.current.get_mut();
+
         if hour > self.current_hour {
             let diff = (hour - self.current_hour) as usize;
             if diff >= JOINS_BACKLOG_SIZE {
@@ -259,13 +279,13 @@ impl GuildJoins {
                 self.log.extend(std::iter::repeat(None).take(diff));
             }
             let back = self.log.back_mut().expect("JOINS_BACKLOG_SIZE > 0");
-            *back = Some(*self.current.get_mut());
+            *back = Some(*current);
+            *current = 0;
         }
 
         debug_assert_eq!(self.log.len(), JOINS_BACKLOG_SIZE);
 
-        let current = self.current.get_mut();
-        *current += 1;
+        *current += count;
         *current
     }
 
