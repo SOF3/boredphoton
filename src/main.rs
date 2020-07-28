@@ -1,5 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::convert::TryFrom;
+use std::fmt;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -115,15 +116,14 @@ impl serenity::client::EventHandler for Handler {
                             }
                             Some("stat") => {
                                 if let Some(guild) = message.guild_id {
-                                    let AddResult { current, average } =
+                                    let AddResult { current, stats } =
                                         self.guild_joins.query(guild);
                                     message.reply(
                                         &ctx,
                                         format!(
-                                            "Current / average = {} / {} = {}",
+                                            "Current = {}\nStats: {}",
                                             current,
-                                            average,
-                                            (current as f64) / (average as f64)
+                                            stats,
                                         ),
                                     )?;
                                 }
@@ -143,14 +143,13 @@ impl serenity::client::EventHandler for Handler {
         trying(|| {
             let guild = guild::Guild::get(&ctx, guild_id)?;
 
-            let AddResult { current, average } = self.guild_joins.add(guild_id, 1);
+            let AddResult { current, stats } = self.guild_joins.add(guild_id, 1);
 
             log::info!(
-                "Guild {} stats: {} / {} = {}",
+                "Guild {} current = {}\nStats: {}",
                 &guild.name,
                 current,
-                average,
-                (current as f64) / average
+                stats,
             );
 
             Ok(())
@@ -200,16 +199,16 @@ impl GuildJoinsMap {
                     {
                         let gjg = gj.read().unwrap();
                         if let Ok(current) = gjg.add(count) {
-                            let average = gjg.average();
-                            return AddResult { current, average };
+                            let stats = gjg.stats();
+                            return AddResult { current, stats };
                         }
                     }
 
                     {
                         let mut gjg = gj.write().unwrap();
                         let current = gjg.add_mut(count);
-                        let average = gjg.average();
-                        return AddResult { current, average };
+                        let stats = gjg.stats();
+                        return AddResult { current, stats };
                     }
                 }
             }
@@ -229,7 +228,7 @@ impl GuildJoinsMap {
 
 struct AddResult {
     current: u32,
-    average: f64,
+    stats: Stats,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -289,21 +288,54 @@ impl GuildJoins {
         *current
     }
 
-    fn average(&self) -> f64 {
-        let mut count = 0;
-        let mut sum = 0;
-        for option in &self.log {
-            if let Some(joins) = option {
-                count += 1;
-                sum += joins;
-            }
+    fn stats(&self) -> Stats {
+        let mut sorted: Vec<u32> = self.log.iter().filter_map(|option| *option).collect();
+        sorted.sort();
+
+        if sorted.is_empty() {
+            return Stats::Empty;
         }
 
-        if count == 0 {
-            f64::NAN
-        } else {
-            (sum as f64) / (count as f64)
+        let count = sorted.len() as f64;
+        let sum = sorted.iter().sum::<u32>() as f64;
+
+        fn weighted_ind(sorted: &[u32], ind: f64) -> f64 {
+            let trunc = ind.trunc();
+            if trunc < 0. {
+                return sorted[0] as f64;
+            }
+            if trunc > sorted.len() as f64 - 1. {
+                return *sorted.last().unwrap() as f64;
+            }
+            let frac = ind.fract();
+            let floor = sorted[ind as usize];
+            let ceil = sorted[ind as usize + 1];
+            (floor as f64) * frac + (ceil as f64) * (1. - frac)
         }
+
+        Stats::Data {
+            average: sum / count,
+            lq: weighted_ind(&sorted[..], (count - 1.) * 0.25),
+            median: weighted_ind(&sorted[..], (count - 1.) * 0.5),
+            uq: weighted_ind(&sorted[..], (count - 1.) * 0.75),
+        }
+    }
+}
+
+#[derive(Debug)]
+enum Stats {
+    Empty,
+    Data {
+        average: f64,
+        lq: f64,
+        median: f64,
+        uq: f64,
+    }
+}
+
+impl fmt::Display for Stats {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
