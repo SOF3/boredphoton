@@ -35,6 +35,7 @@ fn load_config() -> Result<Config, config::ConfigError> {
 #[derive(Deserialize)]
 struct Config {
     discord: DiscordConfig,
+    channels: HashMap<u64, u64>,
 }
 
 #[derive(Deserialize)]
@@ -47,13 +48,20 @@ struct Handler {
     mention_matches: Vec<String>,
     invite_link: String,
     guild_joins: GuildJoinsMap,
+    channels: HashMap<u64, u64>,
 }
 
 impl TryFrom<Config> for Handler {
     type Error = io::Error;
 
     fn try_from(config: Config) -> io::Result<Self> {
-        let client_id = config.discord.client_id;
+        let Config {
+            discord: DiscordConfig {
+                client_id,
+                ..
+            },
+            channels,
+        } = config;
 
         let data_dir = Path::new("data");
         if !data_dir.exists() {
@@ -67,6 +75,7 @@ impl TryFrom<Config> for Handler {
                 client_id
             ),
             guild_joins: GuildJoinsMap::new(data_dir.into()),
+            channels,
         })
     }
 }
@@ -151,6 +160,15 @@ impl serenity::client::EventHandler for Handler {
                 current,
                 stats,
             );
+
+            if stats.is_abnormal(current) {
+                if let Some(&channel) = self.channels.get(&guild_id.as_u64()) {
+                    let channel = id::ChannelId::from(channel);
+                    channel.send_message(&ctx, |m| {
+                        m.content(format!("@here ALERT: abnormal server joins detected, current = {}, stats = {}", current, &stats))
+                    })?;
+                }
+            }
 
             Ok(())
         })
@@ -330,6 +348,17 @@ enum Stats {
         lq: f64,
         median: f64,
         uq: f64,
+    }
+}
+
+impl Stats {
+    fn is_abnormal(&self, current: u32) -> bool {
+        match self {
+            Self::Empty => false,
+            Self::Data { uq, .. } => {
+                (current as f64) > uq * 5.
+            },
+        }
     }
 }
 
