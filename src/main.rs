@@ -307,6 +307,8 @@ impl GuildJoins {
     }
 
     fn stats(&self) -> Stats {
+        dbg!(&self.log);
+
         let mut sorted: Vec<u32> = self.log.iter().filter_map(|option| *option).collect();
         sorted.sort();
 
