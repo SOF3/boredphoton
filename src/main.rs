@@ -56,10 +56,7 @@ impl TryFrom<Config> for Handler {
 
     fn try_from(config: Config) -> io::Result<Self> {
         let Config {
-            discord: DiscordConfig {
-                client_id,
-                ..
-            },
+            discord: DiscordConfig { client_id, .. },
             channels,
         } = config;
 
@@ -119,8 +116,11 @@ impl serenity::client::EventHandler for Handler {
                             return Ok(());
                         }
                         match args.next() {
+                            Some("save") => {
+                                self.guild_joins.save();
+                            }
                             Some("stop") => {
-                                self.guild_joins.finalize();
+                                self.guild_joins.save();
                                 std::process::exit(0);
                             }
                             Some("stat") => {
@@ -129,11 +129,7 @@ impl serenity::client::EventHandler for Handler {
                                         self.guild_joins.query(guild);
                                     message.reply(
                                         &ctx,
-                                        format!(
-                                            "Current = {}\nStats: {}",
-                                            current,
-                                            stats,
-                                        ),
+                                        format!("Current = {}\nStats: {}", current, stats,),
                                     )?;
                                 }
                             }
@@ -165,7 +161,10 @@ impl serenity::client::EventHandler for Handler {
                 if let Some(&channel) = self.channels.get(&guild_id.as_u64()) {
                     let channel = id::ChannelId::from(channel);
                     channel.send_message(&ctx, |m| {
-                        m.content(format!("@here ALERT: abnormal server joins detected, current = {}, stats = {}", current, &stats))
+                        m.content(format!(
+                            "@here ALERT: abnormal server joins detected, current = {}, stats = {}",
+                            current, &stats
+                        ))
                     })?;
                 }
             }
@@ -198,7 +197,7 @@ impl GuildJoinsMap {
         }
     }
 
-    pub fn finalize(&self) {
+    pub fn save(&self) {
         let lock = self.lock.write().unwrap();
 
         for (id, gj) in lock.iter() {
@@ -350,16 +349,14 @@ enum Stats {
         lq: f64,
         median: f64,
         uq: f64,
-    }
+    },
 }
 
 impl Stats {
     fn is_abnormal(&self, current: u32) -> bool {
         match self {
             Self::Empty => false,
-            Self::Data { uq, .. } => {
-                (current as f64) > uq * 5.
-            },
+            Self::Data { uq, .. } => (current as f64) > uq * 5.,
         }
     }
 }
