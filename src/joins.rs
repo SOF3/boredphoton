@@ -1,4 +1,5 @@
 use std::collections::{HashMap, VecDeque};
+use std::fmt;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
@@ -180,6 +181,15 @@ pub struct Stat {
 impl Stat {
     pub fn is_abnormal(&self) -> bool {
         (self.current as f64) > self.uq * 5.
+    }
+}
+
+impl fmt::Display for Stat {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "Average of {} joins/h in {} samples", self.mean, self.n)?;
+        writeln!(f, "Quartiles: {} / {} / {} / {} / {}", self.min, self.lq, self.median, self.uq, self.max)?;
+        writeln!(f, "There were {} joins in the past hour.", self.current)?;
+        Ok(())
     }
 }
 

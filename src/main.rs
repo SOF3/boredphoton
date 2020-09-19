@@ -112,7 +112,7 @@ impl serenity::client::EventHandler for Handler {
                     "stat" => {
                         if let Some(guild) = message.guild_id {
                             let stat = self.guild_joins.add(guild, 0)?;
-                            message.reply(&ctx, format!("Stats: {:?}", stat))?;
+                            message.reply(&ctx, format!("Stats:\n{}", stat))?;
                         }
                     }
                     "adm" => {
@@ -151,7 +151,7 @@ impl serenity::client::EventHandler for Handler {
                     let channel = id::ChannelId::from(channel);
                     channel.send_message(&ctx, |m| {
                         m.content(format!(
-                            "@here ALERT: abnormal server joins detected, stats = {:?}",
+                            "@here ALERT: abnormal server joins detected, stats = {}",
                             &stat
                         ))
                     })?;
