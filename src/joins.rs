@@ -186,8 +186,8 @@ impl Stat {
 
 impl fmt::Display for Stat {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "Average of {} joins/h in {} samples", self.mean, self.n)?;
-        writeln!(f, "Quartiles: {} / {} / {} / {} / {}", self.min, self.lq, self.median, self.uq, self.max)?;
+        writeln!(f, "Average of {:.3} joins/h in {} samples", self.mean, self.n)?;
+        writeln!(f, "Quartiles: {:.3} / {:.3} / {:.3} / {:.3} / {:.3}", self.min, self.lq, self.median, self.uq, self.max)?;
         writeln!(f, "There were {} joins in the past hour.", self.current)?;
         Ok(())
     }
@@ -202,6 +202,9 @@ fn current_hour() -> u64 {
 }
 
 pub fn get_percentile(slice: &[f64], ratio: f64) -> f64 {
+    if slice.len() == 0 {
+        return 0.;
+    }
     let position = linterp(0., (slice.len() - 1) as f64, ratio);
     let low = position.trunc() as usize;
     let high = low + 1;
