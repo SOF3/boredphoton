@@ -180,7 +180,10 @@ pub struct Stat {
 
 impl Stat {
     pub fn is_abnormal(&self) -> bool {
-        (self.current as f64) > self.uq * 5.
+        if self.current <= 8 {
+            return false;
+        }
+        (self.current as f64) > self.uq * 2. + 5.
     }
 }
 
