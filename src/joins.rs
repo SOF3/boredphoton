@@ -189,8 +189,16 @@ impl Stat {
 
 impl fmt::Display for Stat {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "Average of {:.3} joins/h in {} samples", self.mean, self.n)?;
-        writeln!(f, "Quartiles: {:.3} / {:.3} / {:.3} / {:.3} / {:.3}", self.min, self.lq, self.median, self.uq, self.max)?;
+        writeln!(
+            f,
+            "Average of {:.3} joins/h in {} samples",
+            self.mean, self.n
+        )?;
+        writeln!(
+            f,
+            "Quartiles: {:.3} / {:.3} / {:.3} / {:.3} / {:.3}",
+            self.min, self.lq, self.median, self.uq, self.max
+        )?;
         writeln!(f, "There were {} joins in the past hour.", self.current)?;
         Ok(())
     }
