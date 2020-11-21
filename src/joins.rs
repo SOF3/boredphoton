@@ -213,7 +213,7 @@ fn current_hour() -> u64 {
 }
 
 pub fn get_percentile(slice: &[f64], ratio: f64) -> f64 {
-    if slice.len() == 0 {
+    if slice.is_empty() {
         return 0.;
     }
     let position = linterp(0., (slice.len() - 1) as f64, ratio);
