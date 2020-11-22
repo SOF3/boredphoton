@@ -84,7 +84,12 @@ const ADMINS: &[u64] = &[390090409159950338];
 
 #[async_trait::async_trait]
 impl serenity::client::EventHandler for Handler {
-    async fn guild_member_addition(&self, ctx: Context, guild_id: id::GuildId, _member: guild::Member) {
+    async fn guild_member_addition(
+        &self,
+        ctx: Context,
+        guild_id: id::GuildId,
+        _member: guild::Member,
+    ) {
         trying(|| async {
             let guild = guild::Guild::get(&ctx, guild_id).await?;
 
@@ -95,17 +100,20 @@ impl serenity::client::EventHandler for Handler {
             if stat.is_abnormal() {
                 if let Some(&channel) = self.channels.get(&guild_id.as_u64()) {
                     let channel = id::ChannelId::from(channel);
-                    channel.send_message(&ctx, |m| {
-                        m.content(format!(
-                            "@here ALERT: abnormal server joins detected, stats = {}",
-                            &stat
-                        ))
-                    }).await?;
+                    channel
+                        .send_message(&ctx, |m| {
+                            m.content(format!(
+                                "@here ALERT: abnormal server joins detected, stats = {}",
+                                &stat
+                            ))
+                        })
+                        .await?;
                 }
             }
 
             Ok(())
-        }).await
+        })
+        .await
     }
 
     async fn message(&self, ctx: Context, message: channel::Message) {
@@ -136,7 +144,9 @@ impl serenity::client::EventHandler for Handler {
                 let cmd = args.next().expect("split is nonempty");
                 match cmd {
                     "invite" => {
-                        message.reply(&ctx, format!("Invite link: {}", &self.invite_link)).await?;
+                        message
+                            .reply(&ctx, format!("Invite link: {}", &self.invite_link))
+                            .await?;
                     }
                     "stat" => {
                         if let Some(guild) = message.guild_id {
@@ -164,11 +174,16 @@ impl serenity::client::EventHandler for Handler {
             }
 
             Ok(())
-        }).await;
+        })
+        .await;
     }
 }
 
-async fn trying<F,R>(f: F) where F: FnOnce() -> R, R: Future<Output = Result<()>> {
+async fn trying<F, R>(f: F)
+where
+    F: FnOnce() -> R,
+    R: Future<Output = Result<()>>,
+{
     match f().await {
         Ok(()) => (),
         Err(err) => {
