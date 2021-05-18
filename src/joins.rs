@@ -52,7 +52,7 @@ impl GuildJoinsMap {
             let gj = write
                 .entry(guild)
                 .or_insert_with(|| Mutex::new(GuildJoins::read_or_new(path)));
-            let mut lock = gj.lock().unwrap();
+            let mut lock = gj.get_mut().unwrap();
             f(&mut lock)
         }
     }
@@ -147,7 +147,7 @@ impl GuildJoins {
             .log
             .iter()
             .copied()
-            .filter_map(|option| option)
+            .flatten()
             .map(|int| int as f64)
             .collect();
         // we can't have NANs from (int as f64)
