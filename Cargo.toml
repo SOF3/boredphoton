@@ -10,7 +10,7 @@ config = "0.11.0"
 crossbeam = "0.8.1"
 log = "0.4.14"
 pretty_env_logger = "0.4.0"
-serde = {version = "1.0.128", features = ["derive"]}
+serde = {version = "1.0.129", features = ["derive"]}
 serde_json = "1.0.66"
 serenity = "0.10.9"
 tokio = {version = "1.10.0", features = ["rt-multi-thread", "macros"] }
