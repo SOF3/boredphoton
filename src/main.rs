@@ -29,9 +29,10 @@ async fn main() -> Result<()> {
 }
 
 fn load_config() -> Result<Config, config::ConfigError> {
-    let mut config = config::Config::new();
-    config.merge(config::File::with_name("config"))?;
-    config.try_into()
+    let config = config::Config::builder()
+        .add_source(config::File::with_name("config"))
+        .build()?;
+    config.try_deserialize()
 }
 
 #[derive(Deserialize)]
@@ -98,7 +99,7 @@ impl serenity::client::EventHandler for Handler {
             log::info!("Guild {} stats: {:?}", &guild.name, &stat,);
 
             if stat.is_abnormal() {
-                if let Some(&channel) = self.channels.get(&guild_id.as_u64()) {
+                if let Some(&channel) = self.channels.get(guild_id.as_u64()) {
                     let channel = id::ChannelId::from(channel);
                     channel
                         .send_message(&ctx, |m| {

@@ -6,7 +6,7 @@ edition = "2018"
 license = "AGPL-3.0"
 
 [dependencies]
-config = "0.11.0"
+config = "0.13.1"
 crossbeam = "0.8.1"
 log = "0.4.16"
 pretty_env_logger = "0.4.0"

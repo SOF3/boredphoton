@@ -52,8 +52,8 @@ impl GuildJoinsMap {
             let gj = write
                 .entry(guild)
                 .or_insert_with(|| Mutex::new(GuildJoins::read_or_new(path)));
-            let mut lock = gj.get_mut().unwrap();
-            f(&mut lock)
+            let lock = gj.get_mut().unwrap();
+            f(lock)
         }
     }
 
