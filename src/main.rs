@@ -6,7 +6,9 @@ use std::path::Path;
 
 use serde::Deserialize;
 use serenity::client::Context;
-use serenity::model::*;
+use serenity::model::prelude::{ChannelId, GuildId, UserId};
+use serenity::model::{channel, guild};
+use serenity::prelude::GatewayIntents;
 
 mod joins;
 use joins::*;
@@ -21,7 +23,10 @@ async fn main() -> Result<()> {
     let config = load_config()?;
     let token = config.discord.token.to_owned();
     let handler = Handler::try_from(config)?;
-    let mut client = serenity::Client::builder(token)
+    let intents = GatewayIntents::non_privileged()
+        | GatewayIntents::MESSAGE_CONTENT
+        | GatewayIntents::GUILD_MEMBERS;
+    let mut client = serenity::Client::builder(token, intents)
         .event_handler(handler)
         .await
         .expect("Error connecting to discord");
@@ -37,8 +42,9 @@ fn load_config() -> Result<Config, config::ConfigError> {
 
 #[derive(Deserialize)]
 struct Config {
+    admin_ids: Box<[UserId]>,
     discord: DiscordConfig,
-    channels: HashMap<u64, u64>,
+    channels: HashMap<GuildId, ChannelId>,
 }
 
 #[derive(Deserialize)]
@@ -48,10 +54,11 @@ struct DiscordConfig {
 }
 
 struct Handler {
+    admin_ids: Box<[UserId]>,
     mention_matches: Vec<String>,
     invite_link: String,
     guild_joins: GuildJoinsMap,
-    channels: HashMap<u64, u64>,
+    channels: HashMap<GuildId, ChannelId>,
 }
 
 impl TryFrom<Config> for Handler {
@@ -59,13 +66,14 @@ impl TryFrom<Config> for Handler {
 
     fn try_from(config: Config) -> io::Result<Self> {
         let Config {
+            admin_ids,
             discord: DiscordConfig { client_id, .. },
             channels,
         } = config;
 
         let data_dir = Path::new("data");
         if !data_dir.exists() {
-            fs::create_dir_all(&data_dir)?;
+            fs::create_dir_all(data_dir)?;
         }
 
         Ok(Self {
@@ -76,22 +84,16 @@ impl TryFrom<Config> for Handler {
             ),
             guild_joins: GuildJoinsMap::new(data_dir.into()),
             channels,
+            admin_ids,
         })
     }
 }
 
-#[allow(clippy::unreadable_literal)]
-const ADMINS: &[u64] = &[390090409159950338];
-
 #[async_trait::async_trait]
 impl serenity::client::EventHandler for Handler {
-    async fn guild_member_addition(
-        &self,
-        ctx: Context,
-        guild_id: id::GuildId,
-        _member: guild::Member,
-    ) {
+    async fn guild_member_addition(&self, ctx: Context, member: guild::Member) {
         trying(|| async {
+            let guild_id = member.guild_id;
             let guild = guild::Guild::get(&ctx, guild_id).await?;
 
             let stat = self.guild_joins.add(guild_id, 1)?;
@@ -99,8 +101,7 @@ impl serenity::client::EventHandler for Handler {
             log::info!("Guild {} stats: {:?}", &guild.name, &stat,);
 
             if stat.is_abnormal() {
-                if let Some(&channel) = self.channels.get(guild_id.as_u64()) {
-                    let channel = id::ChannelId::from(channel);
+                if let Some(&channel) = self.channels.get(&guild_id) {
                     channel
                         .send_message(&ctx, |m| {
                             m.content(format!(
@@ -119,9 +120,9 @@ impl serenity::client::EventHandler for Handler {
 
     async fn message(&self, ctx: Context, message: channel::Message) {
         trying(|| async {
-            let guild = message.guild(&ctx).await;
+            let guild = message.guild(&ctx);
             let channel = message.channel(&ctx).await;
-            if let (Some(guild), Some(channel::Channel::Guild(channel))) = (guild, channel) {
+            if let (Some(guild), Ok(channel::Channel::Guild(channel))) = (guild, channel) {
                 log::debug!(
                     "Message from {} #{}: <{}> {}",
                     &guild.name,
@@ -156,7 +157,7 @@ impl serenity::client::EventHandler for Handler {
                         }
                     }
                     "adm" => {
-                        if !ADMINS.contains(message.author.id.as_u64()) {
+                        if !self.admin_ids.contains(&message.author.id) {
                             return Ok(());
                         }
                         match args.next() {
